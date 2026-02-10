@@ -9,6 +9,7 @@ import { UseCaseCard } from "./use-case-card";
 import { CognitiveHeatmap } from "./charts/cognitive-heatmap";
 import { TrustTaxWaterfall } from "./charts/trust-tax-waterfall";
 import { HorizonsBubble } from "./charts/horizons-bubble";
+import { ScenarioAnalysisDisplay } from "./scenario-analysis";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -158,17 +159,57 @@ ${decodeHtmlEntities(node.description)}
   (useCases || []).forEach((useCase: UseCase, index: number) => {
     md += `### ${index + 1}. ${decodeHtmlEntities(useCase.title)}
 
-**Horizon:** ${decodeHtmlEntities(useCase.horizonLabel)} (H${useCase.horizon})  
-**Agentic Pattern:** ${patternLabels[useCase.pattern] || decodeHtmlEntities(useCase.patternName)}  
-**Estimated Savings:** ${decodeHtmlEntities(useCase.estimatedSavings)}
+**Horizon:** ${decodeHtmlEntities(useCase.horizonLabel)} (H${useCase.horizon})
+**Agentic Pattern:** ${patternLabels[useCase.pattern] || decodeHtmlEntities(useCase.patternName)}
+**Estimated Savings:** ${decodeHtmlEntities(useCase.estimatedSavings)}${useCase.agenticAutomationLevel ? `  \n**Automation Level:** ${useCase.agenticAutomationLevel}` : ''}
 
 #### The Legacy Way
-${decodeHtmlEntities(useCase.oldWay)}
+`;
 
-#### The Agentic Way
-${decodeHtmlEntities(useCase.agenticWay)}
+    if (useCase.legacyAnnualCost) {
+      md += `**Annual Cost:** $${useCase.legacyAnnualCost.toLocaleString()}\n\n`;
+    }
+    if (useCase.legacyProcessSteps?.length) {
+      md += `**Current Process:**\n`;
+      useCase.legacyProcessSteps.forEach((step, i) => { md += `${i + 1}. ${decodeHtmlEntities(step)}\n`; });
+      md += '\n';
+    }
+    if (useCase.legacyPainPoints?.length) {
+      md += `**Pain Points:**\n`;
+      useCase.legacyPainPoints.forEach(p => { md += `- ${decodeHtmlEntities(p)}\n`; });
+      md += '\n';
+    }
+    const cogMetrics: string[] = [];
+    if (useCase.legacyCognitionNodes) cogMetrics.push(`${useCase.legacyCognitionNodes} cognition nodes`);
+    if (useCase.legacyTranslationTax) cogMetrics.push(`Translation tax: ${decodeHtmlEntities(useCase.legacyTranslationTax)}`);
+    if (useCase.legacyContextSwitching) cogMetrics.push(`Context switching: ${decodeHtmlEntities(useCase.legacyContextSwitching)}`);
+    if (useCase.legacyTimeConsumed) cogMetrics.push(`Time: ${decodeHtmlEntities(useCase.legacyTimeConsumed)}`);
+    if (cogMetrics.length) md += `> ${cogMetrics.join(' | ')}\n\n`;
 
-| Metric | Score |
+    if (!useCase.legacyProcessSteps?.length && !useCase.legacyAnnualCost) {
+      md += `${decodeHtmlEntities(useCase.oldWay)}\n\n`;
+    }
+
+    md += `#### The Agentic Way\n`;
+    if (useCase.agenticPatternRationale) {
+      md += `**Why ${decodeHtmlEntities(useCase.patternName)}:** ${decodeHtmlEntities(useCase.agenticPatternRationale)}\n\n`;
+    }
+    if (useCase.agenticTransformSteps?.length) {
+      md += `**Transforms by:**\n`;
+      useCase.agenticTransformSteps.forEach(s => { md += `- ${decodeHtmlEntities(s)}\n`; });
+      md += '\n';
+    }
+    if (useCase.agenticPrimitives?.length) {
+      md += `**AI Primitives:** ${useCase.agenticPrimitives.map(p => decodeHtmlEntities(p)).join(', ')}\n\n`;
+    }
+    if (useCase.agenticHitlCheckpoints?.length) {
+      md += `**Human-in-the-Loop:** ${useCase.agenticHitlCheckpoints.map(c => decodeHtmlEntities(c)).join('; ')}\n\n`;
+    }
+    if (!useCase.agenticTransformSteps?.length && !useCase.agenticPatternRationale) {
+      md += `${decodeHtmlEntities(useCase.agenticWay)}\n\n`;
+    }
+
+    md += `| Metric | Score |
 |--------|-------|
 | Data Readiness | ${useCase.dataReadiness}/10 |
 | Business Value | ${useCase.businessValue}/10 |
@@ -176,6 +217,21 @@ ${decodeHtmlEntities(useCase.agenticWay)}
 
 `;
   });
+
+  // Scenario Analysis
+  if (result.scenarioAnalysis) {
+    md += `---
+
+## Financial Sensitivity Analysis
+
+| Scenario | Annual Benefit | 3-Year NPV | Payback | Adoption | Ramp |
+|----------|---------------|-------------|---------|----------|------|
+| Conservative | $${result.scenarioAnalysis.conservative.annualBenefit.toLocaleString()} | $${result.scenarioAnalysis.conservative.threeYearNPV.toLocaleString()} | ${result.scenarioAnalysis.conservative.paybackMonths} mo | ${result.scenarioAnalysis.conservative.adoptionRate} | ${result.scenarioAnalysis.conservative.rampTime} |
+| **Base Case** | **$${result.scenarioAnalysis.baseCase.annualBenefit.toLocaleString()}** | **$${result.scenarioAnalysis.baseCase.threeYearNPV.toLocaleString()}** | **${result.scenarioAnalysis.baseCase.paybackMonths} mo** | **${result.scenarioAnalysis.baseCase.adoptionRate}** | **${result.scenarioAnalysis.baseCase.rampTime}** |
+| Optimistic | $${result.scenarioAnalysis.optimistic.annualBenefit.toLocaleString()} | $${result.scenarioAnalysis.optimistic.threeYearNPV.toLocaleString()} | ${result.scenarioAnalysis.optimistic.paybackMonths} mo | ${result.scenarioAnalysis.optimistic.adoptionRate} | ${result.scenarioAnalysis.optimistic.rampTime} |
+
+`;
+  }
 
   md += `---
 
@@ -461,6 +517,12 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         <div data-pdf-section="trust-tax-waterfall">
           <TrustTaxWaterfall data={result.trustTaxBreakdown} />
         </div>
+
+        {result.scenarioAnalysis && (
+          <div data-pdf-section="scenario-analysis">
+            <ScenarioAnalysisDisplay scenarios={result.scenarioAnalysis} />
+          </div>
+        )}
 
         <div data-pdf-section="horizons-intro">
           <SectionExplainer

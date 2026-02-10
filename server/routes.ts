@@ -69,6 +69,7 @@ import type {
   TrustTaxBreakdown,
   CognitiveLoadHeatmapData,
   HorizonsBubbleData,
+  ScenarioAnalysis,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -405,8 +406,9 @@ export async function registerRoutes(
           const pattern = detectPattern(uc.title);
           const trustTax = clamp(uc.trustTaxPercent || 20, 0, 100);
           const savings = uc.savingsAmount || 50000;
+          const currentCost = uc.currentCost || uc.savingsAmount ? Math.round((uc.savingsAmount || 50000) * 2.5) : 125000;
           const payback = uc.paybackMonths || 12;
-          
+
           return {
             id: `usecase-${i}`,
             title: uc.title || `Use Case ${i + 1}`,
@@ -420,6 +422,22 @@ export async function registerRoutes(
             businessValue: clamp(Math.round(savings / 25000) + 3, 1, 10),
             implementationRisk: clamp(Math.round(payback / 4), 1, 10),
             estimatedSavings: `$${savings.toLocaleString()}/year`,
+
+            // Enhanced Legacy Way data
+            legacyAnnualCost: currentCost,
+            legacyProcessSteps: Array.isArray(uc.legacyProcessSteps) ? uc.legacyProcessSteps : undefined,
+            legacyPainPoints: Array.isArray(uc.legacyPainPoints) ? uc.legacyPainPoints : undefined,
+            legacyCognitionNodes: typeof uc.legacyCognitionNodes === 'number' ? uc.legacyCognitionNodes : undefined,
+            legacyTranslationTax: uc.legacyTranslationTax || undefined,
+            legacyContextSwitching: uc.legacyContextSwitching || undefined,
+            legacyTimeConsumed: uc.legacyTimeConsumed || undefined,
+
+            // Enhanced Agentic Way data
+            agenticPatternRationale: uc.agenticPatternRationale || undefined,
+            agenticAutomationLevel: (['full', 'assisted', 'supervised'].includes(uc.agenticAutomationLevel) ? uc.agenticAutomationLevel : undefined) as UseCase['agenticAutomationLevel'],
+            agenticPrimitives: Array.isArray(uc.agenticPrimitives) ? uc.agenticPrimitives : undefined,
+            agenticHitlCheckpoints: Array.isArray(uc.agenticHitlCheckpoints) ? uc.agenticHitlCheckpoints : undefined,
+            agenticTransformSteps: Array.isArray(uc.agenticTransformSteps) ? uc.agenticTransformSteps : undefined,
           };
         });
         
@@ -509,7 +527,53 @@ export async function registerRoutes(
       };
 
       const analysisId = randomUUID();
-      
+
+      // Extract scenario analysis from financial agent if available
+      let scenarioAnalysis: ScenarioAnalysis | undefined;
+      try {
+        const rawScenarios = crewResult?.financialAnalysis?.structuredData?.scenarioAnalysis;
+        if (rawScenarios?.conservative && rawScenarios?.baseCase && rawScenarios?.optimistic) {
+          scenarioAnalysis = {
+            conservative: {
+              label: rawScenarios.conservative.label || "Conservative",
+              description: rawScenarios.conservative.description || "",
+              adoptionRate: rawScenarios.conservative.adoptionRate || "70%",
+              rampTime: rawScenarios.conservative.rampTime || "18 months",
+              realizationRate: rawScenarios.conservative.realizationRate || "75%",
+              annualBenefit: rawScenarios.conservative.annualBenefit || 0,
+              threeYearNPV: rawScenarios.conservative.threeYearNPV || 0,
+              paybackMonths: rawScenarios.conservative.paybackMonths || 0,
+              keyAssumptions: rawScenarios.conservative.keyAssumptions || [],
+            },
+            baseCase: {
+              label: rawScenarios.baseCase.label || "Base Case",
+              description: rawScenarios.baseCase.description || "",
+              adoptionRate: rawScenarios.baseCase.adoptionRate || "85%",
+              rampTime: rawScenarios.baseCase.rampTime || "12 months",
+              realizationRate: rawScenarios.baseCase.realizationRate || "100%",
+              annualBenefit: rawScenarios.baseCase.annualBenefit || 0,
+              threeYearNPV: rawScenarios.baseCase.threeYearNPV || 0,
+              paybackMonths: rawScenarios.baseCase.paybackMonths || 0,
+              keyAssumptions: rawScenarios.baseCase.keyAssumptions || [],
+            },
+            optimistic: {
+              label: rawScenarios.optimistic.label || "Optimistic",
+              description: rawScenarios.optimistic.description || "",
+              adoptionRate: rawScenarios.optimistic.adoptionRate || "95%",
+              rampTime: rawScenarios.optimistic.rampTime || "9 months",
+              realizationRate: rawScenarios.optimistic.realizationRate || "125%",
+              annualBenefit: rawScenarios.optimistic.annualBenefit || 0,
+              threeYearNPV: rawScenarios.optimistic.threeYearNPV || 0,
+              paybackMonths: rawScenarios.optimistic.paybackMonths || 0,
+              keyAssumptions: rawScenarios.optimistic.keyAssumptions || [],
+            },
+          };
+          console.log("[Analyze] Scenario analysis extracted successfully");
+        }
+      } catch (scenarioErr) {
+        console.log("[Analyze] Scenario extraction skipped:", scenarioErr);
+      }
+
       const result: AnalysisResult = {
         id: analysisId,
         organizationProfile: profile,
@@ -520,40 +584,67 @@ export async function registerRoutes(
         cognitiveLoadData,
         trustTaxData,
         horizonsBubbleData,
+        scenarioAnalysis,
         createdAt: new Date().toISOString(),
         ownerToken,
       };
 
       // Save to database FIRST (before sending response) so even if
       // Cloudflare kills the connection at 100s, the data is persisted
+      let saved = false;
+      let saveError: string | undefined;
+
       if (saveAnalysis && ownerToken) {
-        try {
-          console.log("[Analyze] Saving analysis to database BEFORE response...");
-          await storage.createAnalysis({
-            id: analysisId,
-            ownerToken,
-            companyName: profile.companyName,
-            industry: profile.industry,
-            coreBusinessGoal: profile.coreBusinessGoal,
-            currentPainPoints: profile.currentPainPoints,
-            dataLandscape: profile.dataLandscape,
-            executiveSummary: parsedAnalysis.executiveSummary,
-            cognitiveNodes: parsedAnalysis.cognitiveNodes,
-            useCases: parsedAnalysis.useCases,
-            trustTaxBreakdown: parsedAnalysis.trustTaxBreakdown,
-            cognitiveLoadData,
-            trustTaxData,
-            horizonsBubbleData,
-          });
-          console.log("[Analyze] Analysis saved to database successfully:", analysisId);
-        } catch (dbError: any) {
-          console.error("[Analyze] Database save failed (continuing with response):", dbError.message);
+        const MAX_SAVE_RETRIES = 3;
+        for (let attempt = 1; attempt <= MAX_SAVE_RETRIES; attempt++) {
+          try {
+            console.log(`[Analyze] Saving analysis to database (attempt ${attempt}/${MAX_SAVE_RETRIES})...`);
+            await storage.createAnalysis({
+              id: analysisId,
+              ownerToken,
+              companyName: profile.companyName,
+              industry: profile.industry || "",
+              coreBusinessGoal: profile.coreBusinessGoal || "",
+              currentPainPoints: profile.currentPainPoints || "",
+              dataLandscape: profile.dataLandscape || "",
+              executiveSummary: parsedAnalysis.executiveSummary,
+              cognitiveNodes: parsedAnalysis.cognitiveNodes,
+              useCases: parsedAnalysis.useCases,
+              trustTaxBreakdown: parsedAnalysis.trustTaxBreakdown,
+              cognitiveLoadData,
+              trustTaxData,
+              horizonsBubbleData,
+            });
+
+            // Verify save by reading back
+            const verification = await storage.getAnalysis(analysisId);
+            if (verification) {
+              saved = true;
+              console.log("[Analyze] Analysis saved and verified:", analysisId);
+              break;
+            } else {
+              console.warn("[Analyze] Save appeared to succeed but verification failed");
+              saveError = "Save verification failed";
+            }
+          } catch (dbError: any) {
+            console.error(`[Analyze] Database save attempt ${attempt} failed:`, dbError.message);
+            saveError = dbError.message;
+            if (attempt < MAX_SAVE_RETRIES) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+          }
+        }
+
+        if (!saved) {
+          console.error("[Analyze] All save attempts failed for:", analysisId);
         }
       }
 
       return res.json({
         success: true,
         result,
+        saved,
+        saveError: saved ? undefined : saveError,
       });
     } catch (error: any) {
       console.error("Analysis error:", error);

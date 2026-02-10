@@ -16,10 +16,10 @@ export const analyses = pgTable("analyses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerToken: varchar("owner_token").notNull(),
   companyName: varchar("company_name").notNull(),
-  industry: varchar("industry").notNull(),
-  coreBusinessGoal: text("core_business_goal").notNull(),
-  currentPainPoints: text("current_pain_points").notNull(),
-  dataLandscape: text("data_landscape").notNull(),
+  industry: varchar("industry").notNull().default(""),
+  coreBusinessGoal: text("core_business_goal").notNull().default(""),
+  currentPainPoints: text("current_pain_points").notNull().default(""),
+  dataLandscape: text("data_landscape").notNull().default(""),
   executiveSummary: text("executive_summary").notNull(),
   cognitiveNodes: jsonb("cognitive_nodes").notNull().$type<CognitiveNode[]>(),
   useCases: jsonb("use_cases").notNull().$type<UseCase[]>(),
@@ -49,12 +49,13 @@ export type InsertTemplate = typeof templates.$inferInsert;
 export type SelectTemplate = typeof templates.$inferSelect;
 
 // Organization Profile - User input for analysis
+// Only companyName is required; AI will research the rest when not provided
 export const organizationProfileSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
-  industry: z.string().min(1, "Industry is required"),
-  coreBusinessGoal: z.string().min(1, "Core business goal is required"),
-  currentPainPoints: z.string().min(1, "Current pain points are required"),
-  dataLandscape: z.string().min(1, "Data landscape description is required"),
+  industry: z.string().optional().default(""),
+  coreBusinessGoal: z.string().optional().default(""),
+  currentPainPoints: z.string().optional().default(""),
+  dataLandscape: z.string().optional().default(""),
   uploadedDocumentContent: z.string().optional(),
   uploadedDocumentName: z.string().optional(),
 });
@@ -93,6 +94,22 @@ export interface UseCase {
   businessValue: number;
   implementationRisk: number;
   estimatedSavings: string;
+
+  // Enhanced Legacy Way data (optional for backward compatibility)
+  legacyAnnualCost?: number;
+  legacyProcessSteps?: string[];
+  legacyPainPoints?: string[];
+  legacyCognitionNodes?: number;
+  legacyTranslationTax?: string;
+  legacyContextSwitching?: string;
+  legacyTimeConsumed?: string;
+
+  // Enhanced Agentic Way data (optional for backward compatibility)
+  agenticPatternRationale?: string;
+  agenticAutomationLevel?: "full" | "assisted" | "supervised";
+  agenticPrimitives?: string[];
+  agenticHitlCheckpoints?: string[];
+  agenticTransformSteps?: string[];
 }
 
 // Trust Tax Calculation
@@ -127,6 +144,25 @@ export interface HorizonsBubbleData {
   }[];
 }
 
+// Financial Sensitivity Scenarios
+export interface ScenarioDetail {
+  label: string;
+  description: string;
+  adoptionRate: string;
+  rampTime: string;
+  realizationRate: string;
+  annualBenefit: number;
+  threeYearNPV: number;
+  paybackMonths: number;
+  keyAssumptions: string[];
+}
+
+export interface ScenarioAnalysis {
+  conservative: ScenarioDetail;
+  baseCase: ScenarioDetail;
+  optimistic: ScenarioDetail;
+}
+
 // Complete Analysis Result
 export interface AnalysisResult {
   id: string;
@@ -138,6 +174,7 @@ export interface AnalysisResult {
   cognitiveLoadData: CognitiveLoadHeatmapData;
   trustTaxData: TrustTaxWaterfallData;
   horizonsBubbleData: HorizonsBubbleData;
+  scenarioAnalysis?: ScenarioAnalysis;
   createdAt: string;
   ownerToken?: string;
 }

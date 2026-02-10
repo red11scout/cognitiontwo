@@ -59,6 +59,19 @@ export interface FinancialAnalystOutput extends AgentOutput {
       lcoai: number;
       paybackMonths: number;
       documentJustification?: string;
+      // Enriched Legacy Way data
+      legacyProcessSteps?: string[];
+      legacyPainPoints?: string[];
+      legacyCognitionNodes?: number;
+      legacyTranslationTax?: string;
+      legacyContextSwitching?: string;
+      legacyTimeConsumed?: string;
+      // Enriched Agentic Way data
+      agenticPatternRationale?: string;
+      agenticAutomationLevel?: string;
+      agenticPrimitives?: string[];
+      agenticHitlCheckpoints?: string[];
+      agenticTransformSteps?: string[];
     }>;
     totalCurrentCost: number;
     totalProjectedSavings: number;
@@ -69,7 +82,24 @@ export interface FinancialAnalystOutput extends AgentOutput {
       complianceOverhead: number;
       trainingMaintenance: number;
     };
+    scenarioAnalysis?: {
+      conservative: ScenarioDetailRaw;
+      baseCase: ScenarioDetailRaw;
+      optimistic: ScenarioDetailRaw;
+    };
   };
+}
+
+interface ScenarioDetailRaw {
+  label: string;
+  description: string;
+  adoptionRate: string;
+  rampTime: string;
+  realizationRate: string;
+  annualBenefit: number;
+  threeYearNPV: number;
+  paybackMonths: number;
+  keyAssumptions: string[];
 }
 
 export interface SynthesizedAnalysis {

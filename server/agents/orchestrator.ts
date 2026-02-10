@@ -134,7 +134,7 @@ async function synthesizeResults(
 
   const userPrompt = `Synthesize these agent outputs into an executive brief:
 
-ORGANIZATION: ${context.organizationProfile.companyName} (${context.organizationProfile.industry})
+ORGANIZATION: ${context.organizationProfile.companyName} (${context.organizationProfile.industry || "Industry determined by analysis"})
 
 DOCUMENT INTELLIGENCE AGENT OUTPUT:
 Key Findings: ${keyFindings.length > 0 ? keyFindings.join("; ") : "No document provided"}

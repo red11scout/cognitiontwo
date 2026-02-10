@@ -68,7 +68,7 @@ export const documentIntelligenceAgent: Agent = {
       };
     }
 
-    const userPrompt = `Analyze this document for ${context.organizationProfile.companyName} (${context.organizationProfile.industry}):
+    const userPrompt = `Analyze this document for ${context.organizationProfile.companyName} (${context.organizationProfile.industry || "industry to be determined from document/company context"}):
 
 DOCUMENT NAME: ${context.documentName || "Uploaded Document"}
 
@@ -79,9 +79,9 @@ ${context.documentContent}
 
 ORGANIZATION CONTEXT:
 - Company: ${context.organizationProfile.companyName}
-- Industry: ${context.organizationProfile.industry}
-- Business Goal: ${context.organizationProfile.coreBusinessGoal}
-- Pain Points: ${context.organizationProfile.currentPainPoints}
+- Industry: ${context.organizationProfile.industry || "Determine from document and company name"}
+- Business Goal: ${context.organizationProfile.coreBusinessGoal || "Extract from document if available"}
+- Pain Points: ${context.organizationProfile.currentPainPoints || "Identify from document if available"}
 
 Extract comprehensive intelligence from this document that will inform AI transformation strategy.`;
 

@@ -63,7 +63,18 @@ Return ONLY valid JSON:
         "trustTaxPercent": <15-40 typically>,
         "lcoai": <cost per outcome>,
         "paybackMonths": <months to ROI>,
-        "documentJustification": "<reference from document if available>"
+        "documentJustification": "<reference from document if available>",
+        "legacyProcessSteps": ["<step 1 of current manual process>", "<step 2>", ...],
+        "legacyPainPoints": ["<specific quantified pain point>", ...],
+        "legacyCognitionNodes": <number of decision/translation points in the manual process>,
+        "legacyTranslationTax": "<format conversion overhead, e.g. 'Paper → Excel → ERP'>",
+        "legacyContextSwitching": "<system switching cost, e.g. '4 systems, 12 min/switch'>",
+        "legacyTimeConsumed": "<time burden, e.g. '47 hrs/week across team'>",
+        "agenticPatternRationale": "<why this agentic pattern was chosen for this use case>",
+        "agenticAutomationLevel": "full|assisted|supervised",
+        "agenticPrimitives": ["<AI primitive used, e.g. Data Analysis, Workflow Automation, Content Creation>"],
+        "agenticHitlCheckpoints": ["<human-in-the-loop checkpoint, e.g. Manager review for >$50K>"],
+        "agenticTransformSteps": ["<how the process changes, e.g. Auto-classifying inbound docs>", ...]
       }
     ],
     "totalCurrentCost": <sum of current costs>,
@@ -74,9 +85,55 @@ Return ONLY valid JSON:
       "errorCorrection": <percentage>,
       "complianceOverhead": <percentage>,
       "trainingMaintenance": <percentage>
+    },
+    "scenarioAnalysis": {
+      "conservative": {
+        "label": "Conservative",
+        "description": "<what this scenario assumes>",
+        "adoptionRate": "70%",
+        "rampTime": "18 months",
+        "realizationRate": "75%",
+        "annualBenefit": <dollar amount>,
+        "threeYearNPV": <dollar amount>,
+        "paybackMonths": <months>,
+        "keyAssumptions": ["<assumption1>", "<assumption2>", "<assumption3>"]
+      },
+      "baseCase": {
+        "label": "Base Case",
+        "description": "<what this scenario assumes>",
+        "adoptionRate": "85%",
+        "rampTime": "12 months",
+        "realizationRate": "100%",
+        "annualBenefit": <dollar amount>,
+        "threeYearNPV": <dollar amount>,
+        "paybackMonths": <months>,
+        "keyAssumptions": ["<assumption1>", "<assumption2>", "<assumption3>"]
+      },
+      "optimistic": {
+        "label": "Optimistic",
+        "description": "<what this scenario assumes>",
+        "adoptionRate": "95%",
+        "rampTime": "9 months",
+        "realizationRate": "125%",
+        "annualBenefit": <dollar amount>,
+        "threeYearNPV": <dollar amount>,
+        "paybackMonths": <months>,
+        "keyAssumptions": ["<assumption1>", "<assumption2>", "<assumption3>"]
+      }
     }
   }
-}`;
+}
+
+IMPORTANT FOR LEGACY WAY ENRICHMENT:
+- legacyProcessSteps: List 3-6 specific numbered steps of the current manual workflow
+- legacyPainPoints: List 2-4 quantified pain points with specific metrics where possible
+- legacyCognitionNodes: Count the decision points where human judgment converts unstructured to structured data
+- legacyTranslationTax: Describe the format conversion chain (e.g., "Email → PDF → Spreadsheet → Database")
+- legacyContextSwitching: Quantify tool/system switching (e.g., "5 systems, avg 8 min context switch")
+- legacyTimeConsumed: Quantify time burden with specifics (e.g., "32 hrs/week across 4 FTEs")
+- agenticPrimitives: Choose from: Research & Retrieval, Content Creation, Data Analysis, Conversational Interfaces, Workflow Automation, Coding Assistance
+- agenticHitlCheckpoints: Specify EPOCH-filtered human checkpoints (where Empathy/Physicality/Opinion/Leadership is needed)
+- agenticTransformSteps: List 3-5 specific transformation steps showing how AI changes the process`;
 
 export const financialAnalystAgent: Agent = {
   name: "Financial Analyst Agent",
@@ -115,18 +172,26 @@ Build use cases based on these cognitive nodes and their automation potential.
 `;
     }
 
+    const hasDetails = context.organizationProfile.industry &&
+      context.organizationProfile.coreBusinessGoal &&
+      context.organizationProfile.currentPainPoints;
+
+    const researchNote = !hasDetails ? `
+IMPORTANT: The user only provided a company name. Research this company to determine its industry, operations, and financial context. Use your knowledge to provide realistic cost/savings estimates based on what you know about the company and its industry.
+` : "";
+
     const userPrompt = `Calculate financial projections for AI transformation:
 
 ORGANIZATION PROFILE:
 - Company: ${context.organizationProfile.companyName}
-- Industry: ${context.organizationProfile.industry}
-- Business Goal: ${context.organizationProfile.coreBusinessGoal}
-- Pain Points: ${context.organizationProfile.currentPainPoints}
-- Data Landscape: ${context.organizationProfile.dataLandscape}
-${documentContext}
+- Industry: ${context.organizationProfile.industry || "Determine from company name"}
+- Business Goal: ${context.organizationProfile.coreBusinessGoal || "Infer from company context"}
+- Pain Points: ${context.organizationProfile.currentPainPoints || "Identify from industry knowledge"}
+- Data Landscape: ${context.organizationProfile.dataLandscape || "Infer from company and industry"}
+${researchNote}${documentContext}
 ${strategyContext}
 
-Generate realistic use cases with financial projections based on industry benchmarks for ${context.organizationProfile.industry}.
+Generate realistic use cases with financial projections based on industry benchmarks for ${context.organizationProfile.industry || context.organizationProfile.companyName}.
 Use document metrics to justify cost estimates where available.`;
 
     const message = await anthropic.messages.create({

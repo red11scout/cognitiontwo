@@ -104,15 +104,27 @@ YOU MUST reference these document insights in your cognitive node analysis where
 `;
     }
 
+    const hasDetails = context.organizationProfile.industry &&
+      context.organizationProfile.coreBusinessGoal &&
+      context.organizationProfile.currentPainPoints;
+
+    const researchInstructions = !hasDetails ? `
+IMPORTANT: The user only provided a company name. You MUST:
+1. Use your knowledge to determine the company's industry, core business goals, main pain points, and data landscape
+2. If this is a well-known company, use specific knowledge about their operations, challenges, and technology stack
+3. If this is not a well-known company, make reasonable inferences based on the name and any document context provided
+4. Be specific and detailed in your research — don't use generic placeholders
+` : "";
+
     const userPrompt = `Analyze this organization using the Cognitive Zero-Base framework:
 
 ORGANIZATION PROFILE:
 - Company: ${context.organizationProfile.companyName}
-- Industry: ${context.organizationProfile.industry}
-- Business Goal: ${context.organizationProfile.coreBusinessGoal}
-- Pain Points: ${context.organizationProfile.currentPainPoints}
-- Data Landscape: ${context.organizationProfile.dataLandscape}
-${documentContext}
+- Industry: ${context.organizationProfile.industry || "Research this based on the company name"}
+- Business Goal: ${context.organizationProfile.coreBusinessGoal || "Determine the most likely core business goal for this company"}
+- Pain Points: ${context.organizationProfile.currentPainPoints || "Identify the most common pain points for a company like this"}
+- Data Landscape: ${context.organizationProfile.dataLandscape || "Infer the likely data infrastructure based on the company and industry"}
+${researchInstructions}${documentContext}
 
 Identify cognitive nodes and map them to agentic patterns. Be specific and actionable.`;
 

@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { OrganizationForm } from "@/components/organization-form";
 import { AnalysisResults } from "@/components/analysis-results";
 import { ProcessingOverlay } from "@/components/processing-overlay";
-import { PhaseStepper, MobilePhaseProgress } from "@/components/phase-stepper";
+import { MobilePhaseProgress } from "@/components/phase-stepper";
 
 const analysisPhases: AnalysisPhase[] = [
   "cognitive-audit",
@@ -118,10 +118,24 @@ export default function Home() {
         setAnalysisResult(data.result);
         setCurrentPhase("complete");
         queryClient.invalidateQueries({ queryKey: ["/api/analyses", ownerToken] });
-        toast({
-          title: "Analysis Complete",
-          description: "Your Cognitive Zero-Base analysis is ready.",
-        });
+
+        // Store in localStorage as backup
+        try {
+          localStorage.setItem(`analysis_backup_${data.result.id}`, JSON.stringify(data.result));
+        } catch {}
+
+        if (data.saved === false && data.saveError) {
+          toast({
+            title: "Analysis Complete (Save Failed)",
+            description: `Your analysis is ready but could not be saved: ${data.saveError}. You can still view and export it.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Analysis Complete",
+            description: "Your Cognitive Zero-Base analysis is ready.",
+          });
+        }
       } else {
         throw new Error(data.error || "Analysis failed");
       }
@@ -316,9 +330,11 @@ export default function Home() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Badge variant="secondary" className="w-fit">
-                      {analysis.industry}
-                    </Badge>
+                    {analysis.industry && (
+                      <Badge variant="secondary" className="w-fit">
+                        {analysis.industry}
+                      </Badge>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
@@ -362,33 +378,29 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-background">
         {isProcessing && <ProcessingOverlay currentPhase={currentPhase} />}
-        
+
         <AppHeader />
 
         <MobilePhaseProgress currentPhase={currentPhase} isProcessing={isProcessing} />
 
-        <div className="flex">
-          <PhaseStepper currentPhase={currentPhase} isProcessing={isProcessing} />
-          
-          <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-[#001278] dark:text-white mb-2">
-                Cognitive Zero-Base Analysis
-              </h1>
-              <p className="text-muted-foreground text-lg">
-                Transform your organization with AI-powered business intelligence
-              </p>
-            </div>
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl md:text-4xl font-bold text-[#001278] dark:text-white mb-3">
+              Cognitive Zero-Base Analysis
+            </h1>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+              Enter a company name and our AI agents will research and generate a complete transformation analysis.
+            </p>
+          </div>
 
-            <OrganizationForm 
-              onSubmit={handleSubmit} 
-              isLoading={isProcessing}
-              showSaveOption={true}
-              saveAnalysis={saveAnalysis}
-              onSaveAnalysisChange={setSaveAnalysis}
-            />
-          </main>
-        </div>
+          <OrganizationForm
+            onSubmit={handleSubmit}
+            isLoading={isProcessing}
+            showSaveOption={true}
+            saveAnalysis={saveAnalysis}
+            onSaveAnalysisChange={setSaveAnalysis}
+          />
+        </main>
       </div>
     );
   }
